@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String?
+  role        String
+  name        String
+  isVerified  Boolean  @default(false)
+  otp         String?
+  otpExpiry   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  events          Event[]          // For coordinators
+  registrations   Registration[]
+  chatMessages    ChatMessage[]
+  certificates    Certificate[]
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  date            DateTime
+  time            String   // e.g., "10:00 AM - 12:00 PM"
+  venue           String
+  type            String
+  maxParticipants Int?
+  coordinatorId   String
+  coordinator     User     @relation(fields: [coordinatorId], references: [id])
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  registrations   Registration[]
+  chatMessages    ChatMessage[]
+  announcements   Announcement[]
+  feedbackForms   FeedbackForm[]
+  certificates    Certificate[]
+}
+
+model Registration {
+  id          String           @id @default(cuid())
+  eventId     String
+  event       Event            @relation(fields: [eventId], references: [id])
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  teamMembers String?          // JSON string for team members
+  status      String             @default("REGISTERED")
+  qrCode      String?
+  createdAt   DateTime         @default(now())
+
+  // Relations
+  attendance  Attendance?
+}
+
+model Attendance {
+  id             String       @id @default(cuid())
+  registrationId String       @unique
+  registration   Registration @relation(fields: [registrationId], references: [id])
+  checkedInAt    DateTime     @default(now())
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  template  String   // Base64 or URL
+  issuedAt  DateTime @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  timestamp DateTime @default(now())
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  message   String
+  timestamp DateTime @default(now())
+}
+
+model FeedbackForm {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id])
+  questions String   // JSON array of questions
+  responses String?  // JSON array of responses
+  createdAt DateTime @default(now())
+}
