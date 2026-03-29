@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import EventCard from '@/components/EventCard';
 import RegistrationForm from '@/components/RegistrationForm';
@@ -18,6 +18,9 @@ type MyRegistration = {
 
 export default function ExploreEvents() {
   const [events, setEvents] = useState<Event[]>([]);
+  const [categories, setCategories] = useState<string[]>(['all']);
+  const [category, setCategory] = useState('all');
+  const [q, setQ] = useState('');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [myRegs, setMyRegs] = useState<MyRegistration[]>([]);
@@ -28,7 +31,14 @@ export default function ExploreEvents() {
   const fetchEvents = async () => {
     const res = await fetch('/api/events');
     const data = await res.json();
-    setEvents(data);
+    if (Array.isArray(data)) {
+      setEvents(data);
+      const cats = new Set<string>(['all']);
+      data.forEach((e: Event) => {
+        if (e.category) cats.add(e.category);
+      });
+      setCategories([...cats]);
+    }
   };
 
   const fetchMyRegs = async () => {
@@ -47,15 +57,32 @@ export default function ExploreEvents() {
     load();
   }, []);
 
+  const filtered = useMemo(() => {
+    const qq = q.trim().toLowerCase();
+    return events.filter((e) => {
+      if (category !== 'all' && e.category !== category) return false;
+      if (!qq) return true;
+      return (
+        e.name.toLowerCase().includes(qq) ||
+        (e.description ?? '').toLowerCase().includes(qq) ||
+        e.venue.toLowerCase().includes(qq)
+      );
+    });
+  }, [events, category, q]);
+
   const handleRegister = (eventId: string) => {
-    const event = events.find(e => e.id === eventId);
+    const event = events.find((e) => e.id === eventId);
     if (event) {
       setSelectedEvent(event);
       setShowForm(true);
     }
   };
 
-  const handleFormSubmit = async (data: { teamMembers?: TeamMember[] }) => {
+  const handleFormSubmit = async (data: {
+    teamName?: string;
+    teamMembers?: TeamMember[];
+    memberEmails?: string[];
+  }) => {
     try {
       const res = await fetch('/api/registrations', {
         method: 'POST',
@@ -63,6 +90,8 @@ export default function ExploreEvents() {
         body: JSON.stringify({
           eventId: selectedEvent!.id,
           teamMembers: data.teamMembers,
+          teamName: data.teamName,
+          memberEmails: data.memberEmails,
         }),
       });
       if (res.ok) {
@@ -94,16 +123,43 @@ export default function ExploreEvents() {
       <Navbar />
       <div className="mx-auto max-w-6xl px-6 py-10">
         <div className="enter-up mb-8">
-          <h1 className="text-3xl font-black text-slate-900 md:text-4xl">Explore Events</h1>
-          <p className="mt-2 max-w-2xl text-slate-600">
-            Browse upcoming individual and team events. Smooth registration flow, instant updates, and QR-ready access.
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white md:text-4xl">Explore Events</h1>
+          <p className="mt-2 max-w-2xl text-slate-600 dark:text-slate-400">
+            Browse upcoming individual and team events. Filter by category, search by name or venue, then register or open
+            full details.
           </p>
         </div>
 
+        <div className="mb-10 flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search events…"
+            className="nexus-focus flex-1 rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900/80"
+          />
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="nexus-focus rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/80"
+          >
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c === 'all' ? 'All categories' : c}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {events.map(event => (
-            <EventCard key={event.id} event={event} onRegister={handleRegister} />
-          ))}
+          {filtered.length === 0 ? (
+            <p className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white/60 px-6 py-12 text-center text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+              {events.length === 0
+                ? 'No events published yet. Check back soon.'
+                : 'No events match your search or category. Try adjusting filters.'}
+            </p>
+          ) : (
+            filtered.map((event) => <EventCard key={event.id} event={event} onRegister={handleRegister} />)
+          )}
         </div>
 
         <div className="nexus-card mt-12 rounded-2xl p-6">

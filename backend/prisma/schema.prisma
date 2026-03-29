@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       String            @id @default(cuid())
+  email                    String            @unique
+  password                 String?
+  role                     String
+  name                     String
+  isVerified               Boolean           @default(false)
+  otp                      String?
+  otpExpiry                DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  certificates             Certificate[]
+  chatMessages             ChatMessage[]
+  facultyCoordinatedEvents Event[]           @relation("EventFacultyCoordinator")
+  studentCoordinatedEvents Event[]           @relation("EventStudentCoordinator")
+  registrations            Registration[]
+  notifications            Notification[]
+}
+
+model Event {
+  id                   String               @id @default(cuid())
+  name                 String
+  description          String?
+  date                 DateTime
+  time                 String
+  venue                String
+  type                 String
+  maxParticipants      Int?
+  coordinatorId        String
+  studentCoordinatorId String?
+  posterUrl            String?
+  rules                String?
+  onlineLink           String?
+  category             String               @default("General")
+  isActive             Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  announcements        Announcement[]
+  certificates         Certificate[]
+  certificateTemplate  CertificateTemplate?
+  chatMessages         ChatMessage[]
+  coordinator          User                 @relation("EventFacultyCoordinator", fields: [coordinatorId], references: [id])
+  studentCoordinator   User?                @relation("EventStudentCoordinator", fields: [studentCoordinatorId], references: [id])
+  feedbackForms        FeedbackForm[]
+  registrations        Registration[]
+}
+
+model Registration {
+  id               String       @id @default(cuid())
+  eventId          String
+  userId           String
+  teamName         String?
+  teamMembers      String?
+  memberEmails     String?
+  status           String       @default("REGISTERED")
+  waitlistPosition Int?
+  qrCode           String?
+  createdAt        DateTime     @default(now())
+  attendance       Attendance?
+  user             User         @relation(fields: [userId], references: [id])
+  event            Event        @relation(fields: [eventId], references: [id])
+
+  @@index([eventId, status])
+}
+
+model Attendance {
+  id             String       @id @default(cuid())
+  registrationId String     @unique
+  checkedInAt    DateTime     @default(now())
+  registration   Registration @relation(fields: [registrationId], references: [id])
+}
+
+model Certificate {
+  id       String   @id @default(cuid())
+  eventId  String
+  userId   String
+  template String
+  issuedAt DateTime @default(now())
+  pdfUrl   String?
+  user     User     @relation(fields: [userId], references: [id])
+  event    Event    @relation(fields: [eventId], references: [id])
+}
+
+model CertificateTemplate {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  templateData String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  eventId   String
+  userId    String
+  message   String
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  event     Event    @relation(fields: [eventId], references: [id])
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  eventId   String?
+  message   String
+  subject   String?
+  audience  String   @default("ALL_USERS")
+  timestamp DateTime @default(now())
+  event     Event?   @relation(fields: [eventId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FeedbackForm {
+  id        String   @id @default(cuid())
+  eventId   String
+  questions String
+  responses String?
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id])
+}

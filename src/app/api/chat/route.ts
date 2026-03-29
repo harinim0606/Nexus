@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { userCanAccessEventChat } from '@/lib/chatAccess';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,6 +11,10 @@ export async function GET(request: NextRequest) {
 
     const eventId = new URL(request.url).searchParams.get('eventId');
     if (!eventId) return NextResponse.json({ error: 'eventId required' }, { status: 400 });
+
+    if (!(await userCanAccessEventChat(user, eventId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     const rows = await prisma.chatMessage.findMany({
       where: { eventId },
@@ -33,6 +38,10 @@ export async function POST(request: NextRequest) {
     const { eventId, message } = (await request.json()) as { eventId: string; message: string };
     if (!eventId || !message?.trim()) {
       return NextResponse.json({ error: 'eventId and message are required' }, { status: 400 });
+    }
+
+    if (!(await userCanAccessEventChat(user, eventId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const created = await prisma.chatMessage.create({

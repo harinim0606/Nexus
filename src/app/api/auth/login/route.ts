@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyPassword, generateToken } from '@/lib/auth';
 import { sendMagicLink } from '@/lib/email';
+import { toSessionUser } from '@/lib/authSession';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, isMagicLogin } = await request.json();
+    const { email: rawEmail, password, isMagicLogin } = await request.json();
+    const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
@@ -36,7 +41,7 @@ export async function POST(request: NextRequest) {
       }
 
       const token = generateToken(user);
-      const response = NextResponse.json({ user, token });
+      const response = NextResponse.json({ user: toSessionUser(user), token });
       response.cookies.set('token', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

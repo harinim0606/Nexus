@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { canManageEvent } from '@/lib/roles';
 
 type CheckInMethod = 'QR' | 'MANUAL';
 
-function canManageAttendance(role: string) {
+function canManualCheckIn(role: string) {
   return role === 'ADMIN' || role === 'EVENT_COORDINATOR' || role === 'FACULTY_COORDINATOR' || role === 'STUDENT_COORDINATOR';
 }
 
@@ -31,8 +32,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
     }
 
-    if (method === 'MANUAL' && !canManageAttendance(user.role)) {
-      return NextResponse.json({ error: 'Only coordinators/admin can do manual check-in' }, { status: 403 });
+    if (registration.status !== 'REGISTERED') {
+      return NextResponse.json({ error: 'Only active registrations can check in' }, { status: 400 });
+    }
+
+    if (method === 'MANUAL') {
+      if (!canManualCheckIn(user.role)) {
+        return NextResponse.json({ error: 'Only coordinators/admin can do manual check-in' }, { status: 403 });
+      }
+      if (
+        !canManageEvent(
+          user.role,
+          registration.event.coordinatorId,
+          registration.event.studentCoordinatorId,
+          user.id
+        )
+      ) {
+        return NextResponse.json({ error: 'Forbidden for this event' }, { status: 403 });
+      }
     }
 
     if (method === 'QR') {

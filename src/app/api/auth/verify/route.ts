@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { generateToken } from '@/lib/auth';
+import { toSessionUser } from '@/lib/authSession';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,13 +18,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 400 });
     }
 
-    await prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: user.id },
       data: { otp: null, otpExpiry: null, isVerified: true },
+      select: { id: true, email: true, name: true, role: true, isVerified: true },
     });
 
-    const jwtToken = generateToken(user);
-    const response = NextResponse.json({ user, token: jwtToken });
+    const jwtToken = generateToken(updated);
+    const response = NextResponse.json({ user: toSessionUser(updated), token: jwtToken });
     response.cookies.set('token', jwtToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

@@ -1,8 +1,14 @@
-export type Role = 'ADMIN' | 'EVENT_COORDINATOR' | 'FACULTY_COORDINATOR' | 'STUDENT_COORDINATOR' | 'STUDENT';
+export type Role =
+  | 'ADMIN'
+  | 'EVENT_COORDINATOR'
+  | 'FACULTY_COORDINATOR'
+  | 'STUDENT_COORDINATOR'
+  | 'STUDENT'
+  | 'PARTICIPANT';
 
 export type EventType = 'INDIVIDUAL' | 'TEAM';
 
-export type RegistrationStatus = 'REGISTERED' | 'WAITLIST';
+export type RegistrationStatus = 'REGISTERED' | 'WAITLIST' | 'CANCELLED';
 
 export interface User {
   id: string;
@@ -27,7 +33,13 @@ export interface Event {
   type: EventType;
   maxParticipants?: number;
   coordinatorId: string;
+  studentCoordinatorId?: string | null;
   coordinator: User;
+  studentCoordinator?: User | null;
+  posterUrl?: string | null;
+  rules?: string | null;
+  onlineLink?: string | null;
+  category?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -39,8 +51,11 @@ export interface Registration {
   event: Event;
   userId: string;
   user: User;
+  teamName?: string | null;
   teamMembers?: string;
+  memberEmails?: string | null;
   status: RegistrationStatus;
+  waitlistPosition?: number | null;
   qrCode?: string;
   attendance?: Attendance | null;
   createdAt: Date;
@@ -75,9 +90,11 @@ export interface ChatMessage {
 
 export interface Announcement {
   id: string;
-  eventId: string;
-  event: Event;
+  eventId?: string | null;
+  event?: Event | null;
   message: string;
+  subject?: string | null;
+  audience: string;
   timestamp: Date;
 }
 

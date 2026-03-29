@@ -9,7 +9,7 @@ interface CountdownTimerProps {
 }
 
 export default function CountdownTimer({ eventDate, eventTime }: CountdownTimerProps) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #eef4ff;
   --foreground: #0f172a;
@@ -9,6 +11,17 @@
   --primary-dark: #1f4bcb;
   --accent: #7f56d9;
   --ring: rgba(39, 93, 245, 0.35);
+}
+
+.dark {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --surface: #111827;
+  --surface-soft: #0f172a;
+  --primary: #5b8cff;
+  --primary-dark: #3b6fdb;
+  --accent: #a78bfa;
+  --ring: rgba(91, 140, 255, 0.35);
 }
 
 @theme inline {
@@ -29,6 +42,13 @@ body {
     radial-gradient(1200px 500px at 10% -10%, rgba(39, 93, 245, 0.25), transparent 60%),
     radial-gradient(1000px 600px at 100% 0%, rgba(127, 86, 217, 0.2), transparent 60%),
     linear-gradient(180deg, #f3f8ff 0%, #eef4ff 55%, #ffffff 100%);
+}
+
+.dark .nexus-animated-bg {
+  background:
+    radial-gradient(1000px 480px at 12% -8%, rgba(91, 140, 255, 0.18), transparent 55%),
+    radial-gradient(900px 520px at 100% 0%, rgba(167, 139, 250, 0.12), transparent 55%),
+    linear-gradient(180deg, #0b1220 0%, #0f172a 45%, #111827 100%);
 }
 
 .nexus-glass {

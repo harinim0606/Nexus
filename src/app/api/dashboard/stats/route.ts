@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { isCoordinatorRole, isParticipantRole } from '@/lib/roles';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,10 +15,12 @@ export async function GET(request: NextRequest) {
     let upcomingEvents = 0;
     let attendance = 0;
 
-    if (user.role === 'STUDENT') {
-      totalRegistrations = await prisma.registration.count({ where: { userId: user.id } });
+    if (isParticipantRole(user.role)) {
+      totalRegistrations = await prisma.registration.count({
+        where: { userId: user.id, status: { not: 'CANCELLED' } },
+      });
       const studentRegs = await prisma.registration.findMany({
-        where: { userId: user.id },
+        where: { userId: user.id, status: { not: 'CANCELLED' } },
         select: { eventId: true },
       });
       const eventIds = studentRegs.map((r) => r.eventId);
@@ -31,13 +34,18 @@ export async function GET(request: NextRequest) {
       attendance = await prisma.attendance.count({
         where: { registration: { userId: user.id } },
       });
-    } else if (user.role === 'STUDENT_COORDINATOR') {
+    } else if (isCoordinatorRole(user.role) && user.role !== 'ADMIN') {
       const assigned = await prisma.event.findMany({
-        where: { coordinatorId: user.id, isActive: true },
+        where: {
+          isActive: true,
+          OR: [{ coordinatorId: user.id }, { studentCoordinatorId: user.id }],
+        },
         select: { id: true },
       });
       const assignedIds = assigned.map((e) => e.id);
-      totalRegistrations = await prisma.registration.count({ where: { eventId: { in: assignedIds } } });
+      totalRegistrations = await prisma.registration.count({
+        where: { eventId: { in: assignedIds }, status: { not: 'CANCELLED' } },
+      });
       upcomingEvents = await prisma.event.count({
         where: { id: { in: assignedIds }, date: { gte: new Date() }, isActive: true },
       });
@@ -45,7 +53,7 @@ export async function GET(request: NextRequest) {
         where: { registration: { eventId: { in: assignedIds } } },
       });
     } else {
-      totalRegistrations = await prisma.registration.count();
+      totalRegistrations = await prisma.registration.count({ where: { status: { not: 'CANCELLED' } } });
       upcomingEvents = await prisma.event.count({
         where: {
           date: { gte: new Date() },

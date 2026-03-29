@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     const rows = await prisma.registration.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, status: { not: 'CANCELLED' } },
       include: {
         event: true,
         attendance: true,
