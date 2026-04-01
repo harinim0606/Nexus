@@ -69,8 +69,48 @@ body {
 
 .nexus-focus:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px var(--ring);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+}
+
+/* Readable text on all form controls (light + dark) */
+.nexus-focus,
+input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='color']),
+select,
+textarea {
+  border-color: #d1d5db;
+  background-color: #ffffff;
+  color: #111827;
+}
+
+.nexus-focus::placeholder,
+input:not([type='checkbox']):not([type='radio']):not([type='file'])::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
+.dark .nexus-focus,
+.dark input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):not([type='color']),
+.dark select,
+.dark textarea {
+  border-color: #4b5563;
+  background-color: #0f172a;
+  color: #f9fafb;
+}
+
+.dark .nexus-focus::placeholder,
+.dark input:not([type='checkbox']):not([type='radio']):not([type='file'])::placeholder,
+.dark textarea::placeholder {
+  color: #6b7280;
+}
+
+.nexus-focus:focus,
+input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
 }
 
 .enter-up {

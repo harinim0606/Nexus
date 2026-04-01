@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Navbar from '@/components/Navbar';
-import { Event, User } from '@/types';
+import Link from 'next/link';
+import { Event, Registration, User } from '@/types';
 import toast, { Toaster } from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import CertificateDesignerPanel from '@/components/admin/CertificateDesignerPanel';
@@ -64,6 +65,10 @@ export default function AdminDashboard() {
 
   const [certEventId, setCertEventId] = useState('');
 
+  const [seatModalEvent, setSeatModalEvent] = useState<EventRow | null>(null);
+  const [seatRegs, setSeatRegs] = useState<Registration[]>([]);
+  const [seatLoading, setSeatLoading] = useState(false);
+
   const loadUsers = async () => {
     const usersRes = await fetch('/api/users');
     if (!usersRes.ok) {
@@ -86,6 +91,53 @@ export default function AdminDashboard() {
     const eventsData = await eventsRes.json();
     setEvents(eventsData);
     setCertEventId((prev) => prev || (eventsData[0]?.id ?? ''));
+  };
+
+  const openSeatModal = async (ev: EventRow) => {
+    setSeatModalEvent(ev);
+    setSeatLoading(true);
+    try {
+      const res = await fetch(`/api/registrations?eventId=${encodeURIComponent(ev.id)}`, {
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        toast.error('Could not load registrations');
+        setSeatRegs([]);
+        return;
+      }
+      setSeatRegs((await res.json()) as Registration[]);
+    } finally {
+      setSeatLoading(false);
+    }
+  };
+
+  const promoteWaitlist = async (regId: string) => {
+    const res = await fetch(`/api/registrations/${regId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ action: 'promote_from_waitlist' }),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      toast.error(err.error || 'Promote failed');
+      return;
+    }
+    toast.success('Participant confirmed');
+    if (seatModalEvent) void openSeatModal(seatModalEvent);
+    void refreshEvents();
+  };
+
+  const removeParticipant = async (regId: string) => {
+    if (!confirm('Remove this registration?')) return;
+    const res = await fetch(`/api/registrations/${regId}`, { method: 'DELETE', credentials: 'same-origin' });
+    if (!res.ok) {
+      toast.error('Remove failed');
+      return;
+    }
+    toast.success('Removed');
+    if (seatModalEvent) void openSeatModal(seatModalEvent);
+    void refreshEvents();
   };
 
   const downloadExport = async (eventId: string, format: 'pdf' | 'xlsx') => {
@@ -370,7 +422,13 @@ export default function AdminDashboard() {
                 </li>
               </ul>
             </div>
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Link
+                href="/event-management/scan"
+                className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              >
+                QR scanner
+              </Link>
               <button
                 type="button"
                 onClick={resetForm}
@@ -414,6 +472,13 @@ export default function AdminDashboard() {
                         <td className="py-3">{event.coordinator.name}</td>
                         <td className="py-3">{event.studentCoordinator?.name ?? '—'}</td>
                         <td className="py-3">
+                          <button
+                            type="button"
+                            className="mr-3 font-semibold text-emerald-600 dark:text-emerald-400"
+                            onClick={() => void openSeatModal(event)}
+                          >
+                            Seats
+                          </button>
                           <button
                             type="button"
                             className="mr-3 font-semibold text-indigo-600 dark:text-indigo-400"
@@ -811,6 +876,85 @@ export default function AdminDashboard() {
           </div>
         ) : null}
       </div>
+
+      {seatModalEvent ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700">
+              <div>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white">Seats · {seatModalEvent.name}</p>
+                <p className="text-xs text-slate-500">
+                  Cap:{' '}
+                  {seatModalEvent.maxParticipants != null ? seatModalEvent.maxParticipants : '∞'} · Confirmed:{' '}
+                  {seatRegs.filter((r) => r.status === 'CONFIRMED').length} · Waitlist:{' '}
+                  {seatRegs.filter((r) => r.status === 'WAITLISTED').length}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Increase capacity via Edit event. Manual promote sends confirmation + QR email.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-3 py-1 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                onClick={() => {
+                  setSeatModalEvent(null);
+                  setSeatRegs([]);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-auto p-4">
+              {seatLoading ? (
+                <p className="text-sm text-slate-500">Loading…</p>
+              ) : (
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-slate-500">
+                      <th className="py-2">Participant</th>
+                      <th className="py-2">Email</th>
+                      <th className="py-2">Status</th>
+                      <th className="py-2">Details</th>
+                      <th className="py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seatRegs.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="py-2 font-medium">{r.user.name}</td>
+                        <td className="py-2 text-slate-600 dark:text-slate-400">{r.user.email}</td>
+                        <td className="py-2">{r.status}</td>
+                        <td className="max-w-[200px] truncate py-2 text-xs text-slate-500" title={r.participantDetails ?? ''}>
+                          {r.participantDetails ? 'View JSON in exports' : '—'}
+                        </td>
+                        <td className="py-2">
+                          {r.status === 'WAITLISTED' ? (
+                            <button
+                              type="button"
+                              className="mr-2 font-semibold text-emerald-600"
+                              onClick={() => void promoteWaitlist(r.id)}
+                            >
+                              Confirm
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="font-semibold text-red-600"
+                            onClick={() => void removeParticipant(r.id)}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <Toaster />
     </div>
   );

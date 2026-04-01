@@ -8,16 +8,18 @@ datasource db {
 }
 
 model User {
-  id                       String            @id @default(cuid())
-  email                    String            @unique
-  password                 String?
-  role                     String
-  name                     String
-  isVerified               Boolean           @default(false)
-  otp                      String?
-  otpExpiry                DateTime?
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  password             String?
+  role                 String
+  name                 String
+  isVerified           Boolean   @default(false)
+  otp                  String?
+  otpExpiry            DateTime?
+  emailVerifyCode      String?
+  emailVerifyExpiresAt DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
   certificates             Certificate[]
   chatMessages             ChatMessage[]
   facultyCoordinatedEvents Event[]           @relation("EventFacultyCoordinator")
@@ -42,6 +44,7 @@ model Event {
   onlineLink           String?
   category             String               @default("General")
   isActive             Boolean              @default(true)
+  waitlistFinalizedAt  DateTime?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   announcements        Announcement[]
@@ -55,19 +58,27 @@ model Event {
 }
 
 model Registration {
-  id               String       @id @default(cuid())
-  eventId          String
-  userId           String
-  teamName         String?
-  teamMembers      String?
-  memberEmails     String?
-  status           String       @default("REGISTERED")
-  waitlistPosition Int?
-  qrCode           String?
-  createdAt        DateTime     @default(now())
-  attendance       Attendance?
-  user             User         @relation(fields: [userId], references: [id])
-  event            Event        @relation(fields: [eventId], references: [id])
+  id                 String       @id @default(cuid())
+  eventId            String
+  userId             String
+  teamName           String?
+  teamCollegeName    String?
+  teamDepartment     String?
+  leaderName         String?
+  leaderEmail        String?
+  leaderPhone        String?
+  /// JSON string: [{ name, email, phone }, ...]
+  teamMembers        String?
+  memberEmails       String?
+  participantDetails String?
+  status             String       @default("CONFIRMED")
+  waitlistPosition   Int?
+  qrCode             String?
+  qrEmailSentAt      DateTime?
+  createdAt          DateTime     @default(now())
+  attendance         Attendance?
+  user               User         @relation(fields: [userId], references: [id])
+  event              Event        @relation(fields: [eventId], references: [id])
 
   @@index([eventId, status])
 }

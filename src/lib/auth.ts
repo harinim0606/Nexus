@@ -12,15 +12,23 @@ export const verifyPassword = async (password: string, hashedPassword: string): 
   return bcrypt.compare(password, hashedPassword);
 };
 
-type AuthPayload = {
+export type AuthPayload = {
   id: string;
   email: string;
   role: Role;
+  /** false = student/participant must verify email before dashboard */
+  isVerified?: boolean;
 };
 
-export const generateToken = (user: { id: string; email: string; role: string }): string => {
+export const generateToken = (user: {
+  id: string;
+  email: string;
+  role: string;
+  isVerified?: boolean;
+}): string => {
+  const isVerified = user.isVerified !== false;
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role as Role },
+    { id: user.id, email: user.email, role: user.role as Role, isVerified },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -28,7 +36,9 @@ export const generateToken = (user: { id: string; email: string; role: string })
 
 export const verifyToken = (token: string): AuthPayload | null => {
   try {
-    return jwt.verify(token, JWT_SECRET) as AuthPayload;
+    const p = jwt.verify(token, JWT_SECRET) as AuthPayload;
+    if (p && p.isVerified === undefined) p.isVerified = true;
+    return p;
   } catch {
     return null;
   }

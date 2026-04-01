@@ -14,6 +14,8 @@ async function upsertUser({ email, password, name, role }) {
       isVerified: true,
       otp: null,
       otpExpiry: null,
+      emailVerifyCode: null,
+      emailVerifyExpiresAt: null,
     },
     create: {
       email,
@@ -21,6 +23,8 @@ async function upsertUser({ email, password, name, role }) {
       role,
       password: hashedPassword,
       isVerified: true,
+      emailVerifyCode: null,
+      emailVerifyExpiresAt: null,
     },
   });
 }

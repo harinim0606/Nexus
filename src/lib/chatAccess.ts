@@ -20,7 +20,7 @@ export async function userCanAccessEventChat(user: { id: string; role: string },
       where: {
         eventId,
         userId: user.id,
-        status: { in: ['REGISTERED', 'WAITLIST'] },
+        status: { in: ['CONFIRMED', 'WAITLISTED'] },
       },
     });
     return !!reg;

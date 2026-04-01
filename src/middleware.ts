@@ -12,6 +12,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
+  if (path.startsWith('/dashboard') && user && isParticipantRole(user.role) && user.isVerified === false) {
+    const u = encodeURIComponent(user.email || '');
+    return NextResponse.redirect(new URL(`/auth/verify-signup?email=${u}`, request.url));
+  }
+
   if (path.startsWith('/event-management') && !user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const reg = await prisma.registration.findFirst({
-      where: { eventId, userId: user.id, status: 'REGISTERED' },
+      where: { eventId, userId: user.id, status: 'CONFIRMED' },
     });
     if (!reg) {
       return NextResponse.json({ error: 'Registration required' }, { status: 403 });

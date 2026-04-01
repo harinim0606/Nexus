@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       canManageEvent(user.role, event.coordinatorId, event.studentCoordinatorId, user.id) ||
       (isParticipantRole(user.role) &&
         !!(await prisma.registration.findFirst({
-          where: { eventId, userId: user.id, status: { in: ['REGISTERED', 'WAITLIST'] } },
+          where: { eventId, userId: user.id, status: { in: ['CONFIRMED', 'WAITLISTED'] } },
         })));
 
     if (!allowed) {

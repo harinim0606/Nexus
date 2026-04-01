@@ -6,13 +6,13 @@ import EventCard from '@/components/EventCard';
 import RegistrationForm from '@/components/RegistrationForm';
 import Footer from '@/components/Footer';
 import Modal from '@/components/Modal';
-import { Event, TeamMember } from '@/types';
+import { Event, RegistrationParticipantDetails } from '@/types';
 import toast, { Toaster } from 'react-hot-toast';
 
 type MyRegistration = {
   id: string;
   event: Event;
-  status: 'REGISTERED' | 'WAITLIST';
+  status: 'CONFIRMED' | 'WAITLISTED';
   attendance?: { id: string; checkedInAt: string } | null;
 };
 
@@ -78,20 +78,15 @@ export default function ExploreEvents() {
     }
   };
 
-  const handleFormSubmit = async (data: {
-    teamName?: string;
-    teamMembers?: TeamMember[];
-    memberEmails?: string[];
-  }) => {
+  const handleFormSubmit = async (participantDetails: RegistrationParticipantDetails) => {
     try {
       const res = await fetch('/api/registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           eventId: selectedEvent!.id,
-          teamMembers: data.teamMembers,
-          teamName: data.teamName,
-          memberEmails: data.memberEmails,
+          participantDetails,
         }),
       });
       if (res.ok) {
@@ -174,12 +169,14 @@ export default function ExploreEvents() {
                   <p className="mt-1 text-xs font-semibold text-indigo-700">Status: {reg.status}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => openQr(reg.id, reg.event.name)}
-                    className="rounded-xl bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white transition duration-200 hover:scale-[1.02] hover:bg-[var(--primary-dark)]"
-                  >
-                    View QR
-                  </button>
+                  {reg.status === 'CONFIRMED' ? (
+                    <button
+                      onClick={() => openQr(reg.id, reg.event.name)}
+                      className="rounded-xl bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white transition duration-200 hover:scale-[1.02] hover:bg-[var(--primary-dark)]"
+                    >
+                      View QR
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}

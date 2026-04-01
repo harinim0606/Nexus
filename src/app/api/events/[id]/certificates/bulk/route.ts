@@ -33,7 +33,7 @@ export async function POST(
     const snapshot = template?.templateData ?? JSON.stringify({ layout: 'default', eventName: event.name });
 
     const attendees = await prisma.registration.findMany({
-      where: { eventId, status: 'REGISTERED' },
+      where: { eventId, status: 'CONFIRMED' },
       select: { userId: true, user: { select: { email: true, name: true } } },
     });
 

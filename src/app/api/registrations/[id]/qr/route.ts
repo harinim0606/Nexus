@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { generateQR } from '@/lib/qr';
 import { parseEventStartEnd } from '@/lib/schedule';
+import { CONFIRMED } from '@/lib/registrationStatus';
+import { sendEntryQrEmail } from '@/lib/email';
 
 function canAccessRegistration(role: string) {
   return (
@@ -27,14 +29,14 @@ export async function GET(
     const { id } = await context.params;
     const registration = await prisma.registration.findUnique({
       where: { id },
-      include: { event: true },
+      include: { event: true, user: true },
     });
 
     if (!registration) {
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
     }
 
-    if (registration.status !== 'REGISTERED') {
+    if (registration.status !== CONFIRMED) {
       return NextResponse.json({ error: 'QR only available for confirmed registrations' }, { status: 400 });
     }
 
@@ -78,6 +80,19 @@ export async function GET(
     }
 
     const qrDataUrl = await generateQR(tokenValue);
+
+    if (!registration.qrEmailSentAt) {
+      try {
+        await sendEntryQrEmail(registration.user.email, registration.event.name, qrDataUrl);
+        await prisma.registration.update({
+          where: { id: registration.id },
+          data: { qrEmailSentAt: new Date() },
+        });
+      } catch (e) {
+        console.error('Entry QR email failed', e);
+      }
+    }
+
     return NextResponse.json({ registrationId: registration.id, qrDataUrl, token: tokenValue });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

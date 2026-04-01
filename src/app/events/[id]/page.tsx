@@ -9,7 +9,7 @@ import CountdownTimer from '@/components/CountdownTimer';
 import Modal from '@/components/Modal';
 import RegistrationForm from '@/components/RegistrationForm';
 import toast, { Toaster } from 'react-hot-toast';
-import type { Event, TeamMember } from '@/types';
+import type { Event, RegistrationParticipantDetails } from '@/types';
 import { motion } from 'framer-motion';
 
 type EventDetail = Event & {
@@ -59,20 +59,15 @@ export default function EventDetailsPage() {
     return String(event.maxParticipants);
   }, [event]);
 
-  const handleFormSubmit = async (data: {
-    teamName?: string;
-    teamMembers?: TeamMember[];
-    memberEmails?: string[];
-  }) => {
+  const handleFormSubmit = async (participantDetails: RegistrationParticipantDetails) => {
     try {
       const res = await fetch('/api/registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           eventId: event!.id,
-          teamMembers: data.teamMembers,
-          teamName: data.teamName,
-          memberEmails: data.memberEmails,
+          participantDetails,
         }),
       });
       const body = await res.json();

@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth';
 import { isCoordinatorRole } from '@/lib/roles';
 import { endOfLocalDay, parseEventStartEnd, rangesOverlap, startOfLocalDay } from '@/lib/schedule';
 import { assertCoordinatorScheduleOverlap } from '@/lib/eventCoordinatorOverlap';
+import { fillSeatsFromWaitlist } from '@/lib/waitlist';
 
 const FACULTY_COORD_ROLES = ['EVENT_COORDINATOR', 'FACULTY_COORDINATOR'] as const;
 
@@ -289,6 +290,10 @@ export async function PUT(request: NextRequest) {
       },
       include: { coordinator: true, studentCoordinator: true },
     });
+
+    if (parsedMaxParticipants != null) {
+      await fillSeatsFromWaitlist(prisma, id);
+    }
 
     return NextResponse.json(event);
   } catch (error) {

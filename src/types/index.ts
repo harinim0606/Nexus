@@ -8,7 +8,7 @@ export type Role =
 
 export type EventType = 'INDIVIDUAL' | 'TEAM';
 
-export type RegistrationStatus = 'REGISTERED' | 'WAITLIST' | 'CANCELLED';
+export type RegistrationStatus = 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED' | 'DECLINED';
 
 export interface User {
   id: string;
@@ -52,11 +52,18 @@ export interface Registration {
   userId: string;
   user: User;
   teamName?: string | null;
-  teamMembers?: string;
+  teamCollegeName?: string | null;
+  teamDepartment?: string | null;
+  leaderName?: string | null;
+  leaderEmail?: string | null;
+  leaderPhone?: string | null;
+  teamMembers?: string | null;
   memberEmails?: string | null;
+  participantDetails?: string | null;
   status: RegistrationStatus;
   waitlistPosition?: number | null;
   qrCode?: string;
+  qrEmailSentAt?: Date | null;
   attendance?: Attendance | null;
   createdAt: Date;
 }
@@ -110,6 +117,35 @@ export interface FeedbackForm {
 export interface TeamMember {
   name: string;
 }
+
+export type TeamRosterRow = {
+  name: string;
+  email: string;
+  phone: string;
+};
+
+/** Payload sent with POST /api/registrations */
+export type RegistrationParticipantDetails =
+  | {
+      kind: 'individual';
+      fullName: string;
+      email: string;
+      phone: string;
+      collegeName: string;
+      department: string;
+      yearOfStudy: string;
+      gender: string;
+    }
+  | {
+      kind: 'team';
+      teamName: string;
+      teamCollegeName: string;
+      teamDepartment: string;
+      leaderName: string;
+      leaderEmail: string;
+      leaderPhone: string;
+      members: TeamRosterRow[];
+    };
 
 export interface FeedbackQuestion {
   id: string;

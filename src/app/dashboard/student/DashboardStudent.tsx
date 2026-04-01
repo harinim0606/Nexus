@@ -363,7 +363,7 @@ export default function DashboardStudent() {
                     ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {reg.status === 'REGISTERED' ? (
+                    {reg.status === 'CONFIRMED' ? (
                       <button
                         type="button"
                         onClick={() => openQr(reg.id, reg.event.name)}

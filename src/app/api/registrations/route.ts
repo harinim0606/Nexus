@@ -1,15 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
-import { sendRegistrationConfirmationWithStatus } from '@/lib/email';
+import {
+  collectEmailsFromPayload,
+  parseParticipantPayload,
+  rosterEmailsForDb,
+  type ParticipantPayload,
+} from '@/lib/participantPayload';
+import { sendRegistrationConfirmedEmail, sendWaitlistEmail } from '@/lib/email';
 import { isCoordinatorRole, isParticipantRole } from '@/lib/roles';
+import { persistQrAndGetDataUrl } from '@/lib/registrationQr';
+import { CONFIRMED, WAITLISTED } from '@/lib/registrationStatus';
 import type { Prisma } from '@prisma/client';
 
-function parseEmailList(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((x) => (typeof x === 'string' ? x.trim().toLowerCase() : ''))
-    .filter(Boolean);
+function eventMail(
+  event: { name: string; date: Date; time: string; venue: string }
+): { name: string; date: Date; time: string; venue: string } {
+  return { name: event.name, date: event.date, time: event.time, venue: event.venue };
+}
+
+function emailsFromStoredRegistration(r: {
+  user: { email: string };
+  memberEmails: string | null;
+  participantDetails: string | null;
+  leaderEmail: string | null;
+  teamMembers: string | null;
+}): Set<string> {
+  const s = new Set<string>([r.user.email.toLowerCase()]);
+  if (r.leaderEmail?.trim()) s.add(r.leaderEmail.trim().toLowerCase());
+  let roster: unknown = null;
+  if (typeof r.teamMembers === 'string' && r.teamMembers.trim()) {
+    try {
+      roster = JSON.parse(r.teamMembers) as unknown;
+    } catch {
+      roster = null;
+    }
+  }
+  if (Array.isArray(roster)) {
+    for (const m of roster) {
+      if (m && typeof m === 'object' && 'email' in m && typeof (m as { email: unknown }).email === 'string') {
+        s.add((m as { email: string }).email.trim().toLowerCase());
+      }
+    }
+  }
+  if (r.memberEmails) {
+    try {
+      const parsed = JSON.parse(r.memberEmails) as unknown;
+      if (Array.isArray(parsed)) {
+        parsed.forEach((e) => {
+          if (typeof e === 'string') s.add(e.trim().toLowerCase());
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  if (r.participantDetails) {
+    try {
+      const p = JSON.parse(r.participantDetails) as ParticipantPayload;
+      collectEmailsFromPayload(p).forEach((e) => s.add(e));
+    } catch {
+      /* ignore */
+    }
+  }
+  return s;
 }
 
 export async function POST(request: NextRequest) {
@@ -26,15 +80,13 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as {
       eventId: string;
-      teamMembers?: unknown;
-      memberEmails?: unknown;
-      teamName?: unknown;
+      participantDetails?: unknown;
     };
 
-    const { eventId, teamMembers, memberEmails: memberEmailsRaw, teamName: teamNameRaw } = body;
+    const { eventId, participantDetails: detailsRaw } = body;
 
     const existing = await prisma.registration.findFirst({
-      where: { eventId, userId: user.id, status: { in: ['REGISTERED', 'WAITLIST'] } },
+      where: { eventId, userId: user.id, status: { in: [CONFIRMED, WAITLISTED] } },
     });
     if (existing) {
       return NextResponse.json({ error: 'Already registered' }, { status: 400 });
@@ -45,96 +97,95 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
 
+    const parseOpts =
+      event.type === 'TEAM' ? { maxParticipants: event.maxParticipants } : undefined;
+    const parsed = parseParticipantPayload(
+      detailsRaw,
+      event.type as 'INDIVIDUAL' | 'TEAM',
+      user.email,
+      parseOpts
+    );
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const payload = parsed.payload;
+
     const registrationsCount = await prisma.registration.count({
-      where: { eventId, status: 'REGISTERED' },
+      where: { eventId, status: CONFIRMED },
     });
 
-    let status: 'REGISTERED' | 'WAITLIST' = 'REGISTERED';
+    let status: typeof CONFIRMED | typeof WAITLISTED = CONFIRMED;
     if (event.maxParticipants && registrationsCount >= event.maxParticipants) {
-      status = 'WAITLIST';
+      status = WAITLISTED;
     }
 
-    const memberEmailList = parseEmailList(memberEmailsRaw);
-    const teamName =
-      event.type === 'TEAM' && typeof teamNameRaw === 'string' && teamNameRaw.trim()
-        ? teamNameRaw.trim()
-        : null;
-
-    const parsedTeamMemberNames =
-      event.type === 'TEAM' && Array.isArray(teamMembers)
-        ? teamMembers
-            .map((m) => {
-              if (typeof m === 'string') return m;
-              if (typeof m === 'object' && m !== null && 'name' in m) {
-                const maybeName = (m as { name?: unknown }).name;
-                return typeof maybeName === 'string' ? maybeName : undefined;
-              }
-              return undefined;
-            })
-            .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
-        : null;
-
-    if (event.type === 'TEAM' && (!teamName || !parsedTeamMemberNames?.length)) {
-      return NextResponse.json(
-        { error: 'Team name and at least one member name are required' },
-        { status: 400 }
-      );
-    }
-
-    const leaderEmail = user.email.toLowerCase();
-    const allEmails = new Set([leaderEmail, ...memberEmailList]);
+    const newEmails = collectEmailsFromPayload(payload);
 
     const peerRegs = await prisma.registration.findMany({
       where: {
         eventId,
-        status: { in: ['REGISTERED', 'WAITLIST'] },
+        status: { in: [CONFIRMED, WAITLISTED] },
       },
       include: { user: true },
     });
 
     for (const r of peerRegs) {
       if (r.userId === user.id) continue;
-      const emails = new Set<string>([r.user.email.toLowerCase()]);
-      if (r.memberEmails) {
-        try {
-          const parsed = JSON.parse(r.memberEmails) as unknown;
-          if (Array.isArray(parsed)) {
-            parsed.forEach((e) => {
-              if (typeof e === 'string') emails.add(e.toLowerCase());
-            });
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-      for (const e of allEmails) {
-        if (emails.has(e)) {
+      const emails = emailsFromStoredRegistration(r);
+      for (const e of newEmails) {
+        if (e && emails.has(e.toLowerCase())) {
           return NextResponse.json(
-            { error: 'A team member is already registered for this event' },
+            { error: 'A participant with this email is already registered for this event' },
             { status: 400 }
           );
         }
       }
     }
 
-    const waitCount = await prisma.registration.count({ where: { eventId, status: 'WAITLIST' } });
+    const waitCount = await prisma.registration.count({ where: { eventId, status: WAITLISTED } });
 
     const registration = await prisma.registration.create({
       data: {
         eventId,
         userId: user.id,
-        teamName,
-        teamMembers: parsedTeamMemberNames ? JSON.stringify(parsedTeamMemberNames) : null,
-        memberEmails: memberEmailList.length ? JSON.stringify(memberEmailList) : null,
+        participantDetails: JSON.stringify(payload),
         status,
-        waitlistPosition: status === 'WAITLIST' ? waitCount + 1 : null,
+        waitlistPosition: status === WAITLISTED ? waitCount + 1 : null,
+        qrEmailSentAt: null,
+        ...(payload.kind === 'team'
+          ? {
+              teamName: payload.teamName,
+              teamCollegeName: payload.teamCollegeName,
+              teamDepartment: payload.teamDepartment,
+              leaderName: payload.leaderName,
+              leaderEmail: payload.leaderEmail,
+              leaderPhone: payload.leaderPhone,
+              teamMembers: JSON.stringify(payload.members),
+              memberEmails: JSON.stringify(rosterEmailsForDb(payload)),
+            }
+          : {
+              teamName: null,
+              teamCollegeName: null,
+              teamDepartment: null,
+              leaderName: null,
+              leaderEmail: null,
+              leaderPhone: null,
+              memberEmails: null,
+            }),
       },
     });
 
-    await sendRegistrationConfirmationWithStatus(user.email, event.name, status);
+    const evMail = eventMail(event);
+    if (status === CONFIRMED) {
+      await persistQrAndGetDataUrl(prisma, registration.id, event);
+      await sendRegistrationConfirmedEmail(user.email, evMail);
+    } else {
+      await sendWaitlistEmail(user.email, evMail);
+    }
 
     return NextResponse.json(registration);
   } catch (error) {
+    console.error(error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

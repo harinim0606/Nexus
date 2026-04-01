@@ -11,6 +11,7 @@ export type AuthPayload = {
   id: string;
   email: string;
   role: Role;
+  isVerified?: boolean;
 };
 
 function secretKey(): Uint8Array {
@@ -24,7 +25,9 @@ export async function verifyTokenEdge(token: string): Promise<AuthPayload | null
     const email = typeof payload.email === 'string' ? payload.email : null;
     const role = typeof payload.role === 'string' ? (payload.role as Role) : null;
     if (!id || !email || !role) return null;
-    return { id, email, role };
+    const isVerified =
+      payload.isVerified === false ? false : payload.isVerified === true ? true : true;
+    return { id, email, role, isVerified };
   } catch {
     return null;
   }

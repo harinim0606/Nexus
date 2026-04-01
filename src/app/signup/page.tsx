@@ -19,7 +19,11 @@ export default function Signup() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success('Check your email — open the link to finish signing up.');
+        if (data.needsEmailVerification) {
+          window.location.assign(`/auth/verify-signup?email=${encodeURIComponent(email.trim().toLowerCase())}`);
+          return;
+        }
+        toast.success('Check your email for the login link.');
       } else {
         toast.error(data.error || 'Could not start signup');
       }
@@ -35,7 +39,8 @@ export default function Signup() {
       <div className="nexus-card w-full max-w-md rounded-2xl p-8 shadow-xl">
         <h1 className="text-center text-2xl font-bold text-slate-900 dark:text-white">Create account</h1>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-          Create a participant account with your email — no password. We&apos;ll send a magic link to sign you in.
+          Create a participant account with your email — no password. We&apos;ll email you a <strong>6-digit code</strong> to
+          verify your address before you can use your dashboard.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -71,7 +76,7 @@ export default function Signup() {
             type="submit"
             className="w-full rounded-xl bg-[var(--primary)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--primary-dark)]"
           >
-            Email me a sign-up link
+            Send verification code
           </button>
         </form>
 

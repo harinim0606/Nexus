@@ -6,7 +6,7 @@ import EventCard from '@/components/EventCard';
 import type { Event } from '@/types';
 import Modal from '@/components/Modal';
 import RegistrationForm from '@/components/RegistrationForm';
-import type { TeamMember } from '@/types';
+import type { RegistrationParticipantDetails } from '@/types';
 import toast, { Toaster } from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -68,16 +68,15 @@ export default function UpcomingEventsSection() {
     }
   };
 
-  const submitReg = async (data: { teamName?: string; teamMembers?: TeamMember[]; memberEmails?: string[] }) => {
+  const submitReg = async (participantDetails: RegistrationParticipantDetails) => {
     if (!selected) return;
     const res = await fetch('/api/registrations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         eventId: selected.id,
-        teamMembers: data.teamMembers,
-        teamName: data.teamName,
-        memberEmails: data.memberEmails,
+        participantDetails,
       }),
     });
     const body = await res.json();
@@ -153,13 +152,7 @@ export default function UpcomingEventsSection() {
           <RegistrationForm
             eventId={selected.id}
             eventType={selected.type}
-            onSubmit={(data) =>
-              submitReg({
-                teamName: data.teamName,
-                teamMembers: data.teamMembers,
-                memberEmails: data.memberEmails,
-              })
-            }
+            onSubmit={(participantDetails) => void submitReg(participantDetails)}
           />
         ) : null}
       </Modal>

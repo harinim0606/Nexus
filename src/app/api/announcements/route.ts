@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
       if (!a.eventId) return false;
       const st = byEvent.get(a.eventId);
       if (!st) return false;
-      if (a.audience === 'EVENT_PARTICIPANTS') return st === 'REGISTERED';
-      if (a.audience === 'EVENT_WAITLIST') return st === 'WAITLIST';
+      if (a.audience === 'EVENT_PARTICIPANTS') return st === 'CONFIRMED';
+      if (a.audience === 'EVENT_WAITLIST') return st === 'WAITLISTED';
       return false;
     });
 
@@ -108,13 +108,13 @@ export async function POST(request: NextRequest) {
       recipients = await prisma.user.findMany({ select: { id: true, email: true } });
     } else if (audience === 'EVENT_PARTICIPANTS' && body.eventId) {
       const rows = await prisma.registration.findMany({
-        where: { eventId: body.eventId, status: 'REGISTERED' },
+        where: { eventId: body.eventId, status: 'CONFIRMED' },
         include: { user: { select: { id: true, email: true } } },
       });
       recipients = rows.map((r) => ({ id: r.userId, email: r.user.email }));
     } else if (audience === 'EVENT_WAITLIST' && body.eventId) {
       const rows = await prisma.registration.findMany({
-        where: { eventId: body.eventId, status: 'WAITLIST' },
+        where: { eventId: body.eventId, status: 'WAITLISTED' },
         include: { user: { select: { id: true, email: true } } },
       });
       recipients = rows.map((r) => ({ id: r.userId, email: r.user.email }));

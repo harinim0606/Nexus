@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       select: { id: true, email: true, name: true, role: true, isVerified: true },
     });
 
-    const jwtToken = generateToken(updated);
+    const jwtToken = generateToken({ ...updated, isVerified: true });
     const response = NextResponse.json({ user: toSessionUser(updated), token: jwtToken });
     response.cookies.set('token', jwtToken, {
       httpOnly: true,

@@ -35,7 +35,7 @@ export async function GET(
         where: {
           eventId,
           userId: user.id,
-          status: { in: ['REGISTERED', 'WAITLIST'] },
+          status: { in: ['CONFIRMED', 'WAITLISTED'] },
         },
         select: { id: true },
       });
@@ -47,10 +47,10 @@ export async function GET(
     }
 
     const [registered, waitlist, checkedIn] = await Promise.all([
-      prisma.registration.count({ where: { eventId, status: 'REGISTERED' } }),
-      prisma.registration.count({ where: { eventId, status: 'WAITLIST' } }),
+      prisma.registration.count({ where: { eventId, status: 'CONFIRMED' } }),
+      prisma.registration.count({ where: { eventId, status: 'WAITLISTED' } }),
       prisma.attendance.count({
-        where: { registration: { eventId, status: 'REGISTERED' } },
+        where: { registration: { eventId, status: 'CONFIRMED' } },
       }),
     ]);
 

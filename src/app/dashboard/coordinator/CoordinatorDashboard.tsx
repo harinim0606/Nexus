@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import DashboardCard from '@/components/DashboardCard';
@@ -166,7 +167,7 @@ export default function CoordinatorDashboard() {
         toast.error((data as { error?: string }).error || 'Check-in failed');
         return;
       }
-      toast.success('Marked present');
+      toast.success('Marked present — certificate emailed');
       await loadRegistrations(selectedEventId);
       await refreshStats();
       const liveRes = await fetch(`/api/events/${selectedEventId}/live`, { credentials: 'same-origin' });
@@ -222,6 +223,12 @@ export default function CoordinatorDashboard() {
             View <strong>assigned events only</strong>, participant registrations, attendance, manual check-in, exports, and
             feedback forms for your events.
           </p>
+          <Link
+            href="/dashboard/coordinator/scan"
+            className="mt-4 inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+          >
+            Open QR scanner
+          </Link>
         </motion.div>
 
         {loading ? (
@@ -319,9 +326,9 @@ export default function CoordinatorDashboard() {
                       <td className="py-3">
                         <span
                           className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            r.status === 'REGISTERED'
+                            r.status === 'CONFIRMED'
                               ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
-                              : r.status === 'WAITLIST'
+                              : r.status === 'WAITLISTED'
                                 ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/50 dark:text-amber-200'
                                 : 'bg-slate-100 text-slate-700 dark:bg-slate-800'
                           }`}
@@ -339,7 +346,7 @@ export default function CoordinatorDashboard() {
                         )}
                       </td>
                       <td className="py-3">
-                        {r.status === 'REGISTERED' && !r.attendance ? (
+                        {r.status === 'CONFIRMED' && !r.attendance ? (
                           <button
                             type="button"
                             onClick={() => void markPresent(r.id)}
@@ -349,7 +356,7 @@ export default function CoordinatorDashboard() {
                           </button>
                         ) : (
                           <span className="text-xs text-slate-400">
-                            {r.status !== 'REGISTERED' ? 'N/A (not registered)' : 'Checked in'}
+                            {r.status !== 'CONFIRMED' ? 'N/A (not confirmed)' : 'Checked in'}
                           </span>
                         )}
                       </td>

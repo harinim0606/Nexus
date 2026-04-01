@@ -17,6 +17,7 @@ export default function Login() {
       const res = await fetch('/api/auth/magic-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
