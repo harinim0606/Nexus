@@ -12,6 +12,7 @@ import { isCoordinatorRole, isParticipantRole } from '@/lib/roles';
 import { persistQrAndGetDataUrl } from '@/lib/registrationQr';
 import { CONFIRMED, WAITLISTED } from '@/lib/registrationStatus';
 import type { Prisma } from '@prisma/client';
+import { normalizeRegistrationState } from '@/lib/eventLifecycle';
 
 function eventMail(
   event: { name: string; date: Date; time: string; venue: string }
@@ -95,6 +96,39 @@ export async function POST(request: NextRequest) {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    const now = new Date();
+    const normalized = normalizeRegistrationState({
+      eventRegistrationStatus: event.registrationStatus as any,
+      eventRegistrationCloseTime: event.registrationCloseTime,
+      closedByRole: event.closedByRole,
+      date: event.date,
+      time: event.time,
+      now,
+    });
+
+    if (!normalized) {
+      return NextResponse.json({ error: 'Invalid event schedule' }, { status: 400 });
+    }
+
+    const needsUpdate: Record<string, unknown> = {};
+    if (event.registrationCloseTime == null) needsUpdate.registrationCloseTime = normalized.registrationCloseTime;
+    if (event.registrationStatus !== normalized.registrationStatus) {
+      needsUpdate.registrationStatus = normalized.registrationStatus;
+      needsUpdate.closedByRole = normalized.closedByRole;
+    } else if (normalized.registrationStatus === 'CLOSED' && event.closedByRole !== normalized.closedByRole) {
+      needsUpdate.closedByRole = normalized.closedByRole;
+    }
+    if (event.eventStatus !== normalized.eventStatus) needsUpdate.eventStatus = normalized.eventStatus;
+    if (Object.keys(needsUpdate).length > 0) {
+      await prisma.event.update({ where: { id: event.id }, data: needsUpdate as any });
+      Object.assign(event, needsUpdate);
+    }
+
+    // Block registration if registration is closed OR the event has started.
+    if (normalized.registrationStatus === 'CLOSED' || now >= normalized.start) {
+      return NextResponse.json({ error: 'Registration is closed for this event.' }, { status: 400 });
     }
 
     const parseOpts =

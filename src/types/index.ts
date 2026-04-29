@@ -10,6 +10,10 @@ export type EventType = 'INDIVIDUAL' | 'TEAM';
 
 export type RegistrationStatus = 'CONFIRMED' | 'WAITLISTED' | 'CANCELLED' | 'DECLINED';
 
+export type EventRegistrationStatus = 'OPEN' | 'CLOSED';
+export type EventClosedByRole = 'AUTO' | 'ADMIN' | 'FACULTY' | 'STUDENT';
+export type EventStatus = 'UPCOMING' | 'ONGOING' | 'COMPLETED';
+
 export interface User {
   id: string;
   email: string;
@@ -41,6 +45,10 @@ export interface Event {
   onlineLink?: string | null;
   category?: string;
   isActive: boolean;
+  registrationStatus?: EventRegistrationStatus | null;
+  registrationCloseTime?: Date | null;
+  closedByRole?: EventClosedByRole | null;
+  eventStatus?: EventStatus | null;
   createdAt: Date;
   updatedAt: Date;
 }

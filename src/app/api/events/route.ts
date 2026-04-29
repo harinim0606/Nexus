@@ -5,6 +5,7 @@ import { isCoordinatorRole } from '@/lib/roles';
 import { endOfLocalDay, parseEventStartEnd, rangesOverlap, startOfLocalDay } from '@/lib/schedule';
 import { assertCoordinatorScheduleOverlap } from '@/lib/eventCoordinatorOverlap';
 import { fillSeatsFromWaitlist } from '@/lib/waitlist';
+import { computeEventStatus, computeRegistrationCloseTime, normalizeRegistrationState } from '@/lib/eventLifecycle';
 
 const FACULTY_COORD_ROLES = ['EVENT_COORDINATOR', 'FACULTY_COORDINATOR'] as const;
 
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get('q')?.trim().toLowerCase();
     const mine = searchParams.get('mine') === '1';
     const adminAll = searchParams.get('admin') === '1';
+    const upcomingOnly = searchParams.get('upcoming') === '1';
+    const pastOnly = searchParams.get('past') === '1';
 
     const token = request.cookies.get('token')?.value;
     const user = token ? verifyToken(token) : null;
@@ -69,7 +72,52 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { date: 'asc' },
     });
-    return NextResponse.json(events);
+
+    if (!upcomingOnly && !pastOnly) return NextResponse.json(events);
+
+    const now = new Date();
+    const filtered: typeof events = [];
+
+    // We may persist computed auto-close/eventStatus for correctness.
+    for (const ev of events) {
+      const normalized = normalizeRegistrationState({
+        eventRegistrationStatus: ev.registrationStatus as any,
+        eventRegistrationCloseTime: ev.registrationCloseTime,
+        closedByRole: ev.closedByRole,
+        date: ev.date,
+        time: ev.time,
+        now,
+      });
+
+      if (!normalized) continue;
+
+      if (upcomingOnly && normalized.end <= now) continue;
+      if (pastOnly && normalized.end > now) continue;
+
+      const needsUpdate: Record<string, unknown> = {};
+      if (ev.registrationCloseTime == null) needsUpdate.registrationCloseTime = normalized.registrationCloseTime;
+      if (ev.registrationStatus !== normalized.registrationStatus) {
+        needsUpdate.registrationStatus = normalized.registrationStatus;
+        needsUpdate.closedByRole = normalized.closedByRole;
+      } else if (normalized.registrationStatus === 'CLOSED' && ev.closedByRole !== normalized.closedByRole) {
+        needsUpdate.closedByRole = normalized.closedByRole;
+      }
+      if (ev.eventStatus !== normalized.eventStatus) needsUpdate.eventStatus = normalized.eventStatus;
+
+      if (Object.keys(needsUpdate).length > 0) {
+        await prisma.event.update({ where: { id: ev.id }, data: needsUpdate as any });
+      }
+
+      filtered.push({
+        ...ev,
+        registrationStatus: normalized.registrationStatus,
+        registrationCloseTime: normalized.registrationCloseTime,
+        closedByRole: normalized.closedByRole,
+        eventStatus: normalized.eventStatus,
+      });
+    }
+
+    return NextResponse.json(filtered);
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -145,7 +193,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (hasClash) {
-      return NextResponse.json({ error: 'Time and venue clash' }, { status: 400 });
+      return NextResponse.json({ error: 'Selected hall is already booked for this time slot.' }, { status: 400 });
     }
 
     const coordOverlap = await assertCoordinatorScheduleOverlap({
@@ -157,6 +205,10 @@ export async function POST(request: NextRequest) {
     if (coordOverlap) {
       return NextResponse.json({ error: coordOverlap }, { status: 400 });
     }
+
+    const now = new Date();
+    const registrationCloseTime = computeRegistrationCloseTime(parsedNew.start);
+    const eventStatus = computeEventStatus(parsedNew.start, parsedNew.end, now);
 
     const event = await prisma.event.create({
       data: {
@@ -173,6 +225,10 @@ export async function POST(request: NextRequest) {
         rules: rules || null,
         onlineLink: onlineLink || null,
         category: typeof category === 'string' && category.trim() ? category.trim() : 'General',
+        registrationStatus: 'OPEN',
+        registrationCloseTime,
+        closedByRole: null,
+        eventStatus,
       },
       include: { coordinator: true, studentCoordinator: true },
     });
@@ -252,7 +308,7 @@ export async function PUT(request: NextRequest) {
     });
 
     if (hasClash) {
-      return NextResponse.json({ error: 'Time and venue clash' }, { status: 400 });
+      return NextResponse.json({ error: 'Selected hall is already booked for this time slot.' }, { status: 400 });
     }
 
     const coordOverlap = await assertCoordinatorScheduleOverlap({
@@ -265,6 +321,10 @@ export async function PUT(request: NextRequest) {
     if (coordOverlap) {
       return NextResponse.json({ error: coordOverlap }, { status: 400 });
     }
+
+    const now = new Date();
+    const registrationCloseTime = computeRegistrationCloseTime(parsedNew.start);
+    const eventStatus = computeEventStatus(parsedNew.start, parsedNew.end, now);
 
     const event = await prisma.event.update({
       where: { id },
@@ -287,6 +347,8 @@ export async function PUT(request: NextRequest) {
             : typeof category === 'string' && category.trim()
               ? category.trim()
               : 'General',
+        registrationCloseTime,
+        eventStatus,
       },
       include: { coordinator: true, studentCoordinator: true },
     });

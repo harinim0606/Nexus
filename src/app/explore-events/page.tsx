@@ -8,6 +8,7 @@ import Footer from '@/components/Footer';
 import Modal from '@/components/Modal';
 import { Event, RegistrationParticipantDetails } from '@/types';
 import toast, { Toaster } from 'react-hot-toast';
+import { parseEventStartEnd } from '@/lib/schedule';
 
 type MyRegistration = {
   id: string;
@@ -29,7 +30,7 @@ export default function ExploreEvents() {
   });
 
   const fetchEvents = async () => {
-    const res = await fetch('/api/events');
+    const res = await fetch('/api/events?upcoming=1');
     const data = await res.json();
     if (Array.isArray(data)) {
       setEvents(data);
@@ -73,6 +74,10 @@ export default function ExploreEvents() {
   const handleRegister = (eventId: string) => {
     const event = events.find((e) => e.id === eventId);
     if (event) {
+      const status = event.registrationStatus ?? 'OPEN';
+      const parsed = parseEventStartEnd(new Date(event.date), event.time);
+      if (status === 'CLOSED') return;
+      if (parsed && Date.now() >= parsed.start.getTime()) return;
       setSelectedEvent(event);
       setShowForm(true);
     }

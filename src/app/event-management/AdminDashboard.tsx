@@ -93,6 +93,20 @@ export default function AdminDashboard() {
     setCertEventId((prev) => prev || (eventsData[0]?.id ?? ''));
   };
 
+  const closeRegistration = async (eventId: string) => {
+    const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/close-registration`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(err.error || 'Close registration failed');
+      return;
+    }
+    toast.success('Registration closed');
+    await refreshEvents();
+  };
+
   const openSeatModal = async (ev: EventRow) => {
     setSeatModalEvent(ev);
     setSeatLoading(true);
@@ -486,6 +500,15 @@ export default function AdminDashboard() {
                           >
                             Edit
                           </button>
+                      <button
+                        type="button"
+                        className="mr-3 font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-50"
+                        onClick={() => void closeRegistration(event.id)}
+                        disabled={event.registrationStatus === 'CLOSED'}
+                        title={event.registrationStatus === 'CLOSED' ? 'Registration already closed' : 'Close public registration'}
+                      >
+                        Close Registration
+                      </button>
                           <button
                             type="button"
                             className="font-semibold text-red-600"

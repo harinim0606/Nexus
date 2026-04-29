@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { Event } from '@/types';
 import { format } from 'date-fns';
 import CountdownTimer from './CountdownTimer';
 import Link from 'next/link';
+import { parseEventStartEnd } from '@/lib/schedule';
 
 interface EventCardProps {
   event: Event;
@@ -11,6 +13,23 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, onRegister }: EventCardProps) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const canRegister = useMemo(() => {
+    const status = event.registrationStatus ?? 'OPEN';
+    if (status === 'CLOSED') return false;
+
+    const parsed = parseEventStartEnd(new Date(event.date), event.time);
+    if (!parsed) return true;
+
+    return now < parsed.start.getTime();
+  }, [event.date, event.time, event.registrationStatus, now]);
+
   return (
     <div className="nexus-card group rounded-2xl p-6 transition duration-300 hover:-translate-y-1 hover:scale-[1.01] hover:shadow-xl">
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -41,10 +60,18 @@ export default function EventCard({ event, onRegister }: EventCardProps) {
           View Details
         </Link>
         <button
-          onClick={() => onRegister(event.id)}
-          className="w-full rounded-xl bg-[var(--primary)] py-2.5 text-sm font-semibold text-white transition duration-200 hover:scale-[1.02] hover:bg-[var(--primary-dark)]"
+          onClick={() => {
+            if (!canRegister) return;
+            onRegister(event.id);
+          }}
+          disabled={!canRegister}
+          className={`w-full rounded-xl py-2.5 text-sm font-semibold transition duration-200 ${
+            canRegister
+              ? 'bg-[var(--primary)] text-white hover:scale-[1.02] hover:bg-[var(--primary-dark)]'
+              : 'cursor-not-allowed bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+          }`}
         >
-          Register
+          {canRegister ? 'Register' : 'Registration Closed'}
         </button>
       </div>
     </div>

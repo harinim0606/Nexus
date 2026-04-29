@@ -44,6 +44,10 @@ model Event {
   onlineLink           String?
   category             String               @default("General")
   isActive             Boolean              @default(true)
+  registrationStatus  String               @default("OPEN")
+  registrationCloseTime DateTime?
+  closedByRole         String?
+  eventStatus          String               @default("UPCOMING")
   waitlistFinalizedAt  DateTime?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt

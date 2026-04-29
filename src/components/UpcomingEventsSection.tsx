@@ -9,6 +9,7 @@ import RegistrationForm from '@/components/RegistrationForm';
 import type { RegistrationParticipantDetails } from '@/types';
 import toast, { Toaster } from 'react-hot-toast';
 import Link from 'next/link';
+import { parseEventStartEnd } from '@/lib/schedule';
 
 const container = {
   hidden: { opacity: 0 },
@@ -33,7 +34,7 @@ export default function UpcomingEventsSection() {
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch('/api/events');
+      const res = await fetch('/api/events?upcoming=1');
       const data = await res.json();
       if (Array.isArray(data)) {
         setEvents(data);
@@ -63,6 +64,10 @@ export default function UpcomingEventsSection() {
   const onRegister = (eventId: string) => {
     const ev = events.find((x) => x.id === eventId);
     if (ev) {
+      const status = ev.registrationStatus ?? 'OPEN';
+      const parsed = parseEventStartEnd(new Date(ev.date), ev.time);
+      if (status === 'CLOSED') return;
+      if (parsed && Date.now() >= parsed.start.getTime()) return;
       setSelected(ev);
       setModal(true);
     }

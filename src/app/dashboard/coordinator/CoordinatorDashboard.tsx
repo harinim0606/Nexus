@@ -37,6 +37,21 @@ export default function CoordinatorDashboard() {
     setLoading(false);
   }, []);
 
+  const closeRegistration = useCallback(async () => {
+    if (!selectedEventId) return;
+    const res = await fetch(`/api/events/${encodeURIComponent(selectedEventId)}/close-registration`, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || 'Close registration failed');
+      return;
+    }
+    toast.success('Registration closed');
+    await refreshEvents();
+  }, [refreshEvents, selectedEventId]);
+
   const refreshStats = useCallback(async () => {
     const res = await fetch('/api/dashboard/stats', { credentials: 'same-origin' });
     const s = await res.json();
@@ -268,6 +283,21 @@ export default function CoordinatorDashboard() {
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
               Venue: {selectedEvent.venue} · {selectedEvent.time}
             </p>
+          ) : null}
+
+          {selectedEvent ? (
+            <button
+              type="button"
+              onClick={() => void closeRegistration()}
+              disabled={selectedEvent.registrationStatus === 'CLOSED'}
+              className={`mt-3 w-fit rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                selectedEvent.registrationStatus === 'CLOSED'
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              Close Registration
+            </button>
           ) : null}
 
           {live && selectedEventId ? (

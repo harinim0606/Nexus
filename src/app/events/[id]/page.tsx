@@ -11,6 +11,7 @@ import RegistrationForm from '@/components/RegistrationForm';
 import toast, { Toaster } from 'react-hot-toast';
 import type { Event, RegistrationParticipantDetails } from '@/types';
 import { motion } from 'framer-motion';
+import { parseEventStartEnd } from '@/lib/schedule';
 
 type EventDetail = Event & {
   maxParticipants?: number | null;
@@ -34,6 +35,12 @@ export default function EventDetailsPage() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRegister, setShowRegister] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -114,6 +121,11 @@ export default function EventDetailsPage() {
       </div>
     );
   }
+
+  const registrationClosed = event.registrationStatus === 'CLOSED';
+  const parsed = parseEventStartEnd(new Date(event.date), event.time);
+  const hasStarted = parsed ? now >= parsed.start.getTime() : false;
+  const canRegister = !registrationClosed && !hasStarted;
 
   return (
     <div className="min-h-screen nexus-animated-bg">
@@ -203,10 +215,18 @@ export default function EventDetailsPage() {
             </p>
             <button
               type="button"
-              onClick={() => setShowRegister(true)}
-              className="mt-5 w-full rounded-xl bg-[var(--primary)] py-2.5 text-sm font-semibold text-white transition duration-200 hover:scale-[1.02] hover:bg-[var(--primary-dark)]"
+              onClick={() => {
+                if (!canRegister) return;
+                setShowRegister(true);
+              }}
+              disabled={!canRegister}
+              className={`mt-5 w-full rounded-xl py-2.5 text-sm font-semibold transition duration-200 ${
+                canRegister
+                  ? 'bg-[var(--primary)] text-white hover:scale-[1.02] hover:bg-[var(--primary-dark)]'
+                  : 'cursor-not-allowed bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+              }`}
             >
-              Register Now
+              {canRegister ? 'Register Now' : 'Registration Closed'}
             </button>
 
             <div className="mt-6 rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/50">
@@ -217,7 +237,11 @@ export default function EventDetailsPage() {
         </motion.div>
       </div>
 
-      <Modal open={showRegister} title={`Register for ${event.name}`} onClose={() => setShowRegister(false)}>
+      <Modal
+        open={showRegister && canRegister}
+        title={`Register for ${event.name}`}
+        onClose={() => setShowRegister(false)}
+      >
         <RegistrationForm eventId={event.id} eventType={event.type} onSubmit={handleFormSubmit} />
       </Modal>
 
